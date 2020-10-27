@@ -344,7 +344,15 @@ class ArcMarginModel(nn.Module):
         x = F.normalize(input)
         W = F.normalize(self.weight)
         cosine = F.linear(x, W)
-        sine = torch.sqrt(1.0 - torch.pow(cosine, 2))
+        # sine = torch.sqrt(1.0 - torch.pow(cosine, 2))
+        # this is to prevent nans during training. also make sure the learning-rate
+        # for the arcface module (metric_fc) is set around 0.01 at the very minimum
+        # also the margin_s is set to 64 by default, which is very large for other 
+        # architectures. use margine_s of 30.0 and you'll most likely be fine. 
+        # otherwise, you need to use BatchNorm heavily throughout your base architecture
+        # and apply bn even before you return the results from forward().
+        sine = torch.sqrt(torch.clamp(1.0 - torch.pow(cosine, 2)), min=1E-6))
+           
         phi = cosine * self.cos_m - sine * self.sin_m  # cos(theta + m)
         if self.easy_margin:
             phi = torch.where(cosine > 0, phi, cosine)
